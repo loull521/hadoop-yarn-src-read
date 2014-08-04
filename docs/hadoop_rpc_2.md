@@ -135,7 +135,7 @@ Format of a call on the wire:
 - `RpcRequest`
 - The payload header, `RpcRequestHeaderProto`, is a google Protocol Buffers object, hence serializable by Protocol Buffers. The main content of this header are callId, which is an identifier of the RPC request in the connection, and clientId, which is a UUID generated for the client. Negative callIds, are reserved for meta-RPC purposes, e.g., to handshake SASL method. 【负载头，用的是protocol buffer对象，主要内容包括callId，clientId(唯一定义一个client),负数callId保留为meta-RPC purposes。】
 
-payload 本身就是一个method call的序列化表示，用RpcEngine来序列化和反序列化，默认是WritableRpcEngine。（前面的`RpcRequestHeader`被序列化了两次）
+payload 本身就是一个method call的序列化表示，用RpcEngine来序列化和反序列化，默认是WritableRpcEngine。至于为什么混合使用两种序列化方法，官方解释是正在从Writable转到protocol buffer。
 
 ----------
 
