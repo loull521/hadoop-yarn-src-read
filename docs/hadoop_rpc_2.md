@@ -114,7 +114,7 @@ The RPC handshake starts with a [header](https://github.com/apache/hadoop-common
 	+-------------------------------+
 	|  4 bytes length 				|
 	+-------------------------------+
-	| IpcConnectionContextProto     |
+	| IpcConnectionContextProto     | 这里大callId=-3
 	+-------------------------------+
 
 

@@ -117,11 +117,16 @@ Hadoop RPC server：
 	ServiceClass 	1字节  默认是0，当前还没用上
 	AuthProtocol 	1字节
 
+	length			4字节，int类型
+	IpcConnectionContextProto	4字节
+
 	Length 			4字节，表示Rpc请求长度，为下面两项之和
-	RpcRequestHeader
+	RpcRequestHeader	，包括callId，retry等信息
 	RpcRequest
 
-前4项是Connection header。后3个是RPC Request。
+前4项是Connection header。中间2项Connection context。这6项可以合称handshake握手。
+
+后3个是RPC Request。
 
 #### header ####
 
@@ -215,9 +220,9 @@ Hadoop RPC server：
 	          dataLengthBuffer.clear();//dataLengthBuffer清空
 	          data.flip();
 	          //connectionContextRead一开始为false，一旦改成true之后就一直是true。
-	          //说明不管多少次请求，isHeaderReader只有一次是false。也就是header只需要读一次
+	          //说明不管多少次请求，isHeaderReader只有一次是false。
 	          boolean isHeaderRead = connectionContextRead;
-	          processOneRpc(data.array());//第一次处理的是RpcRequestHeader，之后处理的都是RpcRequest
+	          processOneRpc(data.array());//第一次读connectionContext。之后读的就是RPC Request部分
 	          data = null;
 	          if (!isHeaderRead) {
 	            continue;
