@@ -151,4 +151,6 @@ RM作业提交、管理功能
 整个过程分为两个阶段，循环：
 
 1. ApplicationMaster汇报资源需求并领取已经分配到的资源
-2. NodeManager向RM汇报各个container运行状态。如果RM发现这个NM上有空闲资源，进行一次分配，并将分配的资源保存到对应的数据结构(Allocation实例)，等待下一次ApplicationMaster发送心跳时获取。
+2. NodeManager向RM汇报各个container运行状态。如果RM发现这个NM上有空闲资源，进行一次分配，并将分配的资源保存到对应的数据结构，等待下一次ApplicationMaster发送心跳时获取。
+
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rm/rm_allocate_container.png)
