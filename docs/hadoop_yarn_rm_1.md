@@ -85,7 +85,7 @@ RM作业提交、管理功能
 
 ![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rm/RMContainer.png)
 
-## 三、启动Application ##
+## 四、启动Application ##
 
 ![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rm/rm_start_app.png)
 
@@ -98,8 +98,11 @@ RM作业提交、管理功能
 > 绿线是RPC远程调用
 
 > **解释：** 
+> 
 > 1、如果不做额外说明，这里的异步事件调用都是通过RM的AsyncDispatcher调度的。
-> 2、基本上耗时的IO操作都启动其他线程进行异步操作。
+> 
+> 2、基本上耗时的IO操作都启动其他线程进行异步操作。比如RMStateStore的存储事件，还有ResourceScheduler的调度事件。
+> 
 > 3、第15步，`AMLauncher`作为`ContainerManagementProtocol`协议的客户端，与NM通信，要求启动container。这点上有点奇怪。
 
 
@@ -136,7 +139,8 @@ RM作业提交、管理功能
 
 ----------
 
-### RM的中央异步调度器rmdispatcher ###
+### 3、RM的中央异步调度器rmdispatcher调度事件 ###
 
 上图中对使用rmdispatcher的事件调度都简化了，下图表示第三步的正常流程：
 
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rm/rmdispatcher_demo.png)
