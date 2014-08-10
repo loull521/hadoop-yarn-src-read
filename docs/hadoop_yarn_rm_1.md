@@ -89,7 +89,7 @@ RM作业提交、管理功能
 
 ![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rm/rm_start_app.png)
 
-> 注意：
+> 说明：
 > 
 > 蓝线是事件异步调用
 > 
@@ -97,8 +97,21 @@ RM作业提交、管理功能
 > 
 > 绿线是RPC远程调用
 
+> **解释：** 
+> 1、如果不做额外说明，这里的异步事件调用都是通过RM的AsyncDispatcher调度的。
+> 2、基本上耗时的IO操作都启动其他线程进行异步操作。
+> 3、第15步，`AMLauncher`作为`ContainerManagementProtocol`协议的客户端，与NM通信，要求启动container。这点上有点奇怪。
 
-### 详细步骤分析 ###
+
+### 1、大致过程 ###
+
+1. 客户端提交作业后，初始化相关的RMAppImpl、 RMAppAttemptImpl 后直接提交到 Scheduler 组件中。RMAppImpl状态到了ACCEPTTED;RMAppAttempt状态到了SCHEDULED；container的状态是ALLOCATED。对应图中的 `1~10` 。
+2. NM向RM的ResourceTrackerService发出心跳，RM回复要求一个container，触发状态改变。RMApp仍在ACCEPTTED；RMAppAttempt状态到了LAUNCHED；container的状态是ACQUIRED。对应图中`11~16`
+3. NM准备好了container，再次向RM发送心跳，触发状态改变。container的状态是RUNNING。对应图中`17`。
+4. appMaster随后就向 RM 注册且向 ApplicationMasterService 申请资源。RMApp、RMAppAttempt状态都变为RUNNING。对应图中`19~20`。
+5. appMaster 向 ApplicationMasterService 报告完成任务。没画在图中。
+
+### 2、详细步骤分析 ###
 
 1.	RM的组件ClientRMService收到来自客户端的submitApplication请求，函数调用RMAppManager的submitApplication方法。
 2.	RMAppManager提交一个START事件给RM的中央异步调度器（rmdispatcher），调度器把这个事件交给ApplicationEventDispatcher处理。ApplicationEventDispatcher根据ApplicationId找到对应的RMAppImpl状态机，然后给RMAppImpl处理。（后面我把这个过程简化，直接把事件交给相应的状态机，这样图上会更清晰。如果不额外说明，默认抛出的事件都是由rmdispatcher处理，并交给对应的事件处理器。并用rmdispatcher代表RM的中央异步处理器）。
@@ -120,4 +133,10 @@ RM作业提交、管理功能
 18.	RMContainerImpl处理RMContainerEventType.LAUNCHED事件，从ContainerAllocationExpirer的监控列表中把这个RMContainerImpl移除。RMContainerImpl从状态LAUNCHED变为RUNNING。
 19.	启动的ApplicationMaster通过RPC函数ApplicationMasterProtocol#registerApplicationMaster向RM注册，在RM中的ApplicationMasterService收到请求后，发出一个RMAppAttemptEventType.REGISTERED事件。RMAppAttemptImpl处理事件，hook先保存AM的基本信息，比如host、port等，然后发出一个RMAppEventType.ATTEMPT_REGISTERED事件。RMAppAttemptImpl状态从LAUNCHED到RUNNING。
 20.	RMAppImpl处理RMAppEventType.ATTEMPT_REGISTERED事件，状态从ACCETPPED到RUNNING。
+
+----------
+
+### RM的中央异步调度器rmdispatcher ###
+
+上图中对使用rmdispatcher的事件调度都简化了，下图表示第三步的正常流程：
 
