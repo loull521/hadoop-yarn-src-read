@@ -2,7 +2,9 @@
 
 ### Client-Server交互顺序图 ###
 
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/rpc_client_server.png)
 
+图来自：http://fengshenwu.com/blog/2012/08/30/the_hadoop_0191_rpc_code_analysis/
 
 ----------
 
