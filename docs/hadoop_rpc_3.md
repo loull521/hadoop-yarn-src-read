@@ -1,5 +1,11 @@
 # Hadoop Yarn源码阅读 -- hadoop RPC框架Client(三)#
 
+### Client-Server交互顺序图 ###
+
+
+
+----------
+
 我看的是Hadoop-2.4.1的源代码。
 
 首先，我们先写一个demo来看看怎么使用hadoop RPC框架：
