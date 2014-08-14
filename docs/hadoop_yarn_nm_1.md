@@ -83,7 +83,23 @@ Container启动过程主要经历三个阶段：
 #### 详细过程 ####
 
 1. `ContainerManagerImpl`收到`startContainers`RPC请求。更新NMToken。创建`ContainerImpl`状态机，发送`ApplicationEventType.INIT_APPLICATION`(如果这个NM上还没有`applicationImpl`状态机，先创建`applicationImpl`状态机)和`ApplicationEventType.INIT_CONTAINER`事件。
-2. `ApplicationImpl`处理这两个事件。(1)发送一个记录日志的事件。(2)找出`ApplicationEventType.INIT_CONTAINER`事件对应的container，添加到app持有的containers集合。
+2. `ApplicationImpl`处理这两个事件。
+	1. 发送一个记录日志的事件。然后发送一个`ApplicationEventType.APPLICATION_LOG_HANDLING_INITED`事件。`ApplicationImpl`处理这个事件状态不变，还是`INITING`，然后发送一个`LocalizationEventType.INIT_APPLICATION_RESOURCES`事件。
+		1. `ResourceLocalizationService`处理这个事件。先创建一个application tracker structs应用跟踪数据结构。然后发送`ApplicationEventType.APPLICATION_INITED`事件。
+		2. `ApplicationImpl`处理这个事件，状态从`INITING`变为`RUNNING`。然后再发送`ContainerEventType.INIT_CONTAINER`事件。到这里，对于是否是第一次在这个NM上启动没有关系了，已经一致了。
+	2. 找出`ApplicationEventType.INIT_CONTAINER`事件对应的container，添加到app持有的containers集合。如果这时候`ApplicationImpl`的状态是`INITING`，什么都不做了，知道状态变为`RUNNING`。然后发送一个`ContainerEventType.INIT_CONTAINER`事件。
+3. `ContainerImpl`处理`ContainerEventType.INIT_CONTAINER`事件。先查看需要的资源，把 PUBLIC,PRIVATE,APPLICATION 级别的资源请求放到Container的不同列表里面，然后把这些请求放到map里面，再封装到事件中，发出`LocalizationEventType.INIT_CONTAINER_RESOURCES`资源请求事件。如果有需要请求下载的资源，返回`ContainerState.LOCALIZING`状态；否则，发送`ContainersLauncherEventType.LAUNCH_CONTAINER`启动container事件，返回`ContainerState.LOCALIZED`状态。
+4. 不解释
+5. `ResourceLocalizationService`处理`INIT_CONTAINER_RESOURCES`事件。对于每一类资源请求，创建一个`LocalResourcesTrackerImpl`进行跟踪，然后调用`tracker#handle(ResourceEventType.REQUEST)`,这里表示不用中央异步处理器出处理这个事件，而是同步调用，在这个handle方法里面，会先创建一个`LocalizedResource`状态机。然后交个这个状态机去处理`ResourceEventType.REQUEST`事件。
+	1. `LocalizdResource`处理`ResourceEventType.REQUEST`事件，状态从`INIT`变为`DOWNLOADING`。发送`LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION`事件。
+	2. `LocalizerTracker`处理这个事件，如果要请求的资源类型是`APPLICATION`，会创建一个`LocalizerRunner`去异步处理资源请求。
 
 
 待续。。。
+
+Point：
+
+- 资源本地化
+- 过程中有一些记录history到文件系统的事件，这部分省略
+- 还有一些组册到推测监听器的事件，也省略
+

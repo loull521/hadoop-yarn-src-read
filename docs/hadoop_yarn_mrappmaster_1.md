@@ -22,19 +22,19 @@
 
 ### 1、JobImpl状态机 ###
 
-![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/MRJobImpl.png)
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/JobImpl.png)
 
 ----------
 
 ### 2、TaskImpl状态机 ###
 
-![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/MRTaskImpl.png)
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/TaskImpl.png)
 
 ----------
 
 ### 3、TaskAttemptImpl状态机 ###
 
-![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/MRJobAttemptImpl.png)
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/am/TaskAttemptImpl.png)
 
 ----------
 
@@ -59,6 +59,33 @@ MRAppMaster 则会启动 stop()流程，依次释放资源，清理资源等。n
 
 #### 详细过程 ####
 
-1. `MRAppMaster`启动的最后发出 `JobEventType.JOB_INIT` 事件，然后直接同步调用处理器去处理这个事件(非异步)。
-2. `JobImpl`处理这个事件。初始化 job 信息，并且创建 `mapTask` 和 `reduceTask`。让 jobImpl 持有这些 task。
-3. 
+1. `MRAppMaster`启动的最后发出 `JobEventType.JOB_INIT` 事件，然后直接同步调用处理器去处理这个事件(非异步)。初始化 job 信息，并且创建 `mapTask` 和 `reduceTask`。让 jobImpl 持有这些 task 对象。`JobImpl` 状态从 `NEW` 变为 `INIT`。然后直接调用 `startJobs` 启动job，发送发送`JobEventType.JOB_START`事件。
+2. `JobImpl`处理 `JobEventType.JOB_START` 事件, 状态变为 `SETUP`。记录历史事件，并设置输出`OutputCommitter#setupJob`。完成后发出事件 `JobEventType.JOB_SETUP_COMPLETED`，`JobImpl`的状态变为`RUNNING`，触发hook 调用 `scheduleTasks`函数，发出 `TaskEventType.T_SCHEDULE` 事件。
+3. `TaskImpl` 处理`TaskEventType.T_SCHEDULE` 事件，状态从`NEW`变为`SCHEDULED`。hook函数会实例化一个 `TaskAttemptImpl`对象并持有它，然后发送 `TaskAttemptEventType.TA_SCHEDULE`事件。
+4. `TaskAttemptImpl`处理`TaskAttemptEventType.TA_SCHEDULE`事件，状态从`NEW`变为`UNASSIGNED`。hook会发送`ContainerAllocator.EventType.CONTAINER_REQ`事件，表示请求container。
+5. `RMContainerAllocator` 会处理`ContainerAllocator.EventType.CONTAINER_REQ`事件，异步处理这个事件，把这个事件转化为请求（向RM申请资源的请求）。然后又是异步处理，RMContainerAllocator 会启动一个线程，发送心跳 heartbeat，去向RM请求container。`RMContainerAllocator#heartbeat` 方法会先获取已分配到的container资源，把这些container 分配给 taskAttempt，并发送`TaskAttemptEventType.TA_ASSIGNED`事件。没分配调的container 释放掉。
+6. `TaskAttemptImpl`处理`TaskAttemptEventType.TA_ASSIGNED`事件，状态从`UNASSIGNED`，变为`ASSIGNED`。然后这个`TaskAttemptImpl`持有分配给它的 container，创建`ContainerLauncherContext`对象，里面填充了启动container需要的信息。注册TaskAttemptListener，管理各个任务的心跳信息，探测任务是否还活着。发送`ContainerLauncher.EventType.CONTAINER_REMOTE_LAUNCH`事件。
+7. `ContainerLauncherImpl` **异步**处理 `ContainerLauncher.EventType.CONTAINER_REMOTE_LAUNCH`事件。
+8. 在`ContainerLauncherImpl#launch` 方法里面，先获取或生成一个 RPC 客户端代理，RPC调用`startContainers`方法，要求启动container。发送`TaskAttemptEventType.TA_CONTAINER_LAUNCHED`事件。
+9. `TaskAttemptImpl`处理`TaskAttemptEventType.TA_CONTAINER_LAUNCHED`事件，状态从`ASSIGNED`到`RUNNING`。hook方法里面， 会注册`TaskAttemptListener`监听器来监控这个taskAttempt。设置 `taskAttempt.remoteTesk = null`。发送`TaskEventType.T_ATTEMPT_LAUNCHED`事件。
+10. `TaskImpl` 处理 `TaskEventType.T_ATTEMPT_LAUNCHED`事件，状态从 `SCHEDULED` 到 `RUNNING`。
+
+----------
+
+> 第8步中，在AM的环境中，`ContainerLauncherImpl#launch` 方法里面获取 RPC 调用`startContainers`，要求启动container。
+> 
+> NM中的`ContainerManagerImpl`作为RPC协议`ContainerManagerImpl`的server端，接收这个请求并处理。在`startContainers`方法里面调用`startContainerInternal`来启动container。
+> 
+> 在NM的中，先资源本地化，到`ContainersLauncher`接收`LAUNCH_CONTAINER`事件，异步启动一个`ContainerLaunch`来启动任务。会调用`ContainerLaunch#call`方法。
+> 
+> `ContainerLaunch#call`方法详解：从 RPC 请求中获取 `ContainerLaunchContext`对象，从中获取执行命令cmd并本地环境化，创建本地目录，放入执行命令脚本，所需要的资源(在前面步骤已经从hdfs下载到本地)。发送`ContainerEventType.CONTAINER_LAUNCHED`事件。调用`ContainerExecutor#activateContainer`方法active container，调用`ContainerExecutor#launchContainer`执行container里面的task，这是个阻塞方法，阻塞到container退出。正常结束，发送`ContainerEventType.CONTAINER_EXITED_WITH_SUCCESS`事件。
+> 
+> container中启动的是`YarnChild`类，在`main`方法里面生成 `TaskUmbilicalProtocol`协议的代理对象，RPC调用`getTask`获取`JvmTask`任务实例，从中拿出`Task`实例(mapTask或reduceTask)，创建这个 task 的运行配置conf，然后异步执行这个 task。后面的执行过程详见`MapTask`或`ReduceTask`。
+> task 任务完成的时候，会进行一个 RPC 调用 `TaskUmbilicalProtocol#done`，AM的`TaskAttemptListenerImpl`作为服务器会处理这个请求。
+
+----------
+
+- n1：`TaskAttemptListenerImpl`接到`done`rpc请求，发送一个`TaskAttemptEventType.TA_DONE`事件。
+- n2：后面的过程不说了。。。
+
+需要注意的是：一个TaskImpl完成，并不代表所有的task已经完成，Job怎么知道所有的任务已经完成？？
