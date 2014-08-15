@@ -91,8 +91,11 @@ Container启动过程主要经历三个阶段：
 3. `ContainerImpl`处理`ContainerEventType.INIT_CONTAINER`事件。先查看需要的资源，把 PUBLIC,PRIVATE,APPLICATION 级别的资源请求放到Container的不同列表里面，然后把这些请求放到map里面，再封装到事件中，发出`LocalizationEventType.INIT_CONTAINER_RESOURCES`资源请求事件。如果有需要请求下载的资源，返回`ContainerState.LOCALIZING`状态；否则，发送`ContainersLauncherEventType.LAUNCH_CONTAINER`启动container事件，返回`ContainerState.LOCALIZED`状态。
 4. 不解释
 5. `ResourceLocalizationService`处理`INIT_CONTAINER_RESOURCES`事件。对于每一类资源请求，创建一个`LocalResourcesTrackerImpl`进行跟踪，然后调用`tracker#handle(ResourceEventType.REQUEST)`,这里表示不用中央异步处理器出处理这个事件，而是同步调用，在这个handle方法里面，会先创建一个`LocalizedResource`状态机。然后交个这个状态机去处理`ResourceEventType.REQUEST`事件。
-	1. `LocalizdResource`处理`ResourceEventType.REQUEST`事件，状态从`INIT`变为`DOWNLOADING`。发送`LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION`事件。
-	2. `LocalizerTracker`处理这个事件，如果要请求的资源类型是`APPLICATION`，会创建一个`LocalizerRunner`去异步处理资源请求。
+	1. （5.2）`LocalizdResource`处理`ResourceEventType.REQUEST`事件，状态从`INIT`变为`DOWNLOADING`。发送`LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION`事件。
+	2. （5.3）`LocalizerTracker`处理这个事件，如果要请求的资源类型是`APPLICATION`，会创建一个`LocalizerRunner`去异步处理资源请求。
+	3. （5.4）调用`ContainerLocalizer#startLocalizer`去本地化资源。`ContainerLocalizer`是抽象类，这里用它的子类`LinuxContainerLocalizer`为例。先创建执行命令集合command，设置好command之后，用shell的实例去执行command，这个过程实际上运行的是`ContainerLocalizer`的 main 方法，main方法里面调用 `runLocalization`方法，先获取一个 `LocalizationProtocol`协议代理，用线程池启动线程去本地化资源（通过发心跳的方式跟`ResourceLocalizationService`通信）。
+	4. （5.5）`ResourceLocalizationService`处理heartbeat，经过处理，发送`ResourceEventType.LOCALIZED`事件。
+	5. （5.6）`LocalizedResource`状态机处理`ResourceEventType.LOCALIZED`事件，状态从`DOWNLOADING`变为`LOCALIZED`。然后发送`ContainerEventType.RESOURCE_LOCALIZED`事件。
 
 
 待续。。。

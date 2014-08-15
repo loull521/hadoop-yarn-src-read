@@ -76,7 +76,7 @@ MRAppMaster 则会启动 stop()流程，依次释放资源，清理资源等。n
 > 
 > NM中的`ContainerManagerImpl`作为RPC协议`ContainerManagerImpl`的server端，接收这个请求并处理。在`startContainers`方法里面调用`startContainerInternal`来启动container。
 > 
-> 在NM的中，先资源本地化，到`ContainersLauncher`接收`LAUNCH_CONTAINER`事件，异步启动一个`ContainerLaunch`来启动任务。会调用`ContainerLaunch#call`方法。
+> 在NM的中，先资源本地化，到`ContainersLauncher`接收`LAUNCH_CONTAINER`事件，异步实例化一个`ContainerLaunch`对象来启动任务。会调用`ContainerLaunch#call`方法。
 > 
 > `ContainerLaunch#call`方法详解：从 RPC 请求中获取 `ContainerLaunchContext`对象，从中获取执行命令cmd并本地环境化，创建本地目录，放入执行命令脚本，所需要的资源(在前面步骤已经从hdfs下载到本地)。发送`ContainerEventType.CONTAINER_LAUNCHED`事件。调用`ContainerExecutor#activateContainer`方法active container，调用`ContainerExecutor#launchContainer`执行container里面的task，这是个阻塞方法，阻塞到container退出。正常结束，发送`ContainerEventType.CONTAINER_EXITED_WITH_SUCCESS`事件。
 > 
