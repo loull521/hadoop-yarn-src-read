@@ -1,0 +1,117 @@
+Hadoop 2.4.1 Release Notes
+
+YARN-2081
+	TestDistributedShell fails after YARN-1962
+	一个测试用例TestDistributedShell.java里的bug，小问题，没有细看。
+	
+YARN-2066
+	Wrong field is referenced in GetApplicationsRequestPBImpl#mergeLocalToBuilder()
+	priority级别为minor
+	就是一个字段写错了
+	if (this.finish != null) {
+      builder.setFinishBegin(start.getMinimumLong());//把start改为finish
+      builder.setFinishEnd(start.getMaximumLong());
+    }
+	在代码中应该是给GetApplicationsRequestProto.Builder builder添加上一些属性，也就是给Google的序列号工具protoc的实例添加上时间等信息。
+	这个bug对整个框架的使用应该没什么影响。
+	
+YARN-2053	Priority: Major，Affects Version/s:2.4.0
+	Slider AppMaster fails to restart: NPE in RegisterApplicationMasterResponseProto$Builder.addAllNmTokensFromPreviousAttempts
+	Priority：major，影响版本2.4.0
+	Slider AppMaster重启出错，暂时我也不知道这是什么东西，从代码修复看：
+	// For work-preserving AM restart, retrieve previous attempts' containers
+    // and corresponding NM tokens.
+	// 在AM重启时，需要获取之前的 NM tokens，如果 token 为 null，重启会出错，避免把null加到nmTokens列表，
+	// 原代码中没有进行null检查，导致NPE
+	public RegisterApplicationMasterResponse registerApplicationMaster(
+         List<NMToken> nmTokens = new ArrayList<NMToken>();
+         for (Container container : transferredContainers) {
+           try {
+-            nmTokens.add(rmContext.getNMTokenSecretManager()
+-              .createAndGetNMToken(app.getUser(), applicationAttemptId,
+-                container));
++            NMToken token = rmContext.getNMTokenSecretManager()
++                .createAndGetNMToken(app.getUser(), applicationAttemptId,
++                    container);
++            if (null != token) {
++              nmTokens.add(token);
++            }
+           } catch (IllegalArgumentException e) {
+             // if it's a DNS issue, throw UnknowHostException directly and that
+             // will be automatically retried by RMProxy in RPC layer.
+			 
+
+YARN-2016	Priority: Major，Affects Version/s:2.4.0
+	Yarn getApplicationRequest start time range is not honored
+	When we query for the previous applications by creating an instance of GetApplicationsRequest and setting the start time range and application tag, we see that the start range provided is not honored and all applications with the tag are returned Attaching a reproducer.
+	创建一个GetApplicationRequest的实例，并设置开始时间和tag信息，用来查询之前的applications。发现start time不发挥作用。
+	修复：给GetApplicationsRequestProto.Builder对象添加上一些限制信息
+getApplicationRequest：调研这个功能	
+
+	
+YARN-1986	Priority: Critical，Affects Version/s:2.4.0
+	In Fifo Scheduler, node heartbeat in between creating app and attempt causes NPE
+	在FIFO调度中，在app创建和就绪中间发生 node 心跳会导致NPE。
+	原因：
+	1) APP_ADDED // will create SchedulerApplication
+	2) NODE_UPDATE // will access SchedulerApplication.getCurrentAppAttempt(), it's null currently. :(
+	3) APP_ATTEMPT_ADDED // will call SchedulerApplication.setCurrentAppAttempt(...)
+	
+YARN-1976	Priority: Major，Affects Version/s:null
+	Tracking url missing http protocol for FAILED application
+	获取Failed application 的url时，少了“http”
+	
+YARN-1962	Priority: Major，Affects Version/s:2.4.0
+	Timeline server is enabled by default
+	Timeline目前不安全和稳定，改为默认不启动
+	
+YARN-1957	Priority: Major，Affects Version/s:2.4.0
+	ProportionalCapacitPreemptionPolicy handling of corner cases...
+	ProportionalCapacitPreemptionPolicy策略以下在两种情况下需要修改：
+	1) when rebalancing over-capacity allocations, it potentially preempts without considering the maxCapacity constraints of a queue (i.e., preempting possibly more than strictly necessary)
+	2) a zero capacity queue is preempted even if there is no demand (coherent with old use of zero-capacity to disabled queues)
+	The proposed patch fixes both issues, and introduce few new test cases.
+	
+YARN-1934	Priority: Blocker，Affects Version/s:2.4.0
+	Potential NPE in ZKRMStateStore caused by handling Disconnected event from ZK.
+	对于ZK disconnected event，zkClient被设置为null，很容易出现NPE。
+	Call flow is attached file issue is 
+	1. Disconnected event which made zkClient=null.
+	2. Call for ZKRMStateStore.updateApplicationAttemptStateInternal() from RMAppAttemptImpl.(EXPIRED event not yet come).
+	
+YARN-1932	Priority: Blocker，Affects Version/s:2.4.0
+	Javascript injection on the job status page
+	Priority: Blocker
+	潜在危险：脚本注入到job state page
+	Scripts can be injected into the job status page as the diagnostics field is not sanitized.We need escaping the diagnostic string in order to not run the scripts.
+	
+YARN-1931	Priority: Blocker，Affects Version/s:2.4.0
+	Private API change in YARN-1824 in 2.4 broke compatibility with previous releases
+	之前的修改影响了兼容性，添加回去一些旧的api
+	
+YARN-1929	Priority: Blocker，Affects Version/s:null
+	Blocker bug
+	DeadLock in RM when automatic failover is enabled.
+	自动修复启动时RM出现死锁。
+	修复：去掉一些synchronized字段
+	
+YARN-1924	Critical bug，Affects Version/s:2.4.0
+	STATE_STORE_OP_FAILED happens when ZKRMStateStore tries to update app(attempt) before storing it
+	原因：The problem is that if we kill the application when the app is at submitted state. The app will try to save the final state before the initial state is saved, which causing no-node-exist exception.
+	Changed the ZK updateState API to check if the node exists. If it exists, do set operation, otherwise do create operation.
+	
+YARN-1908	Priority: Major，Affects Version/s:2.4.0
+	Distributed shell with custom script has permission error.
+	
+YARN-1861	Priority: Blocker，Affects Version/s:2.4.0
+	Both RM stuck in standby mode when automatic failover is enabled
+	自动修复启动时两个RM都变为备用状态，没有一个是活跃的
+	
+YARN-1701	Priority: Major，Affects Version/s:2.4.0
+	Improve default paths of timeline store and generic history store
+	升级timeline store 和 generic history store 的路径。
+	
+YARN-1696	Priority: Blocker，Affects Version/s:2.3.0
+	Document RM HA
+	Add documentation for RM HA. Marking this a blocker for 2.4 as this is required to call RM HA Stable and ready for public consumption.
+	
