@@ -1,8 +1,10 @@
 # CapacityScheduler #
 
-### AM请求资源 或 RM给分配AM的container ###
+----------
 
-AM资源请求，RM调用Scheduler的 allocate 方法
+### 一、AM请求资源 或 RM给分配AM的container ###
+
+AM资源请求，RM调用Scheduler的 `allocate` 方法
 
 	public Allocation allocate(ApplicationAttemptId applicationAttemptId,
       List<ResourceRequest> ask, List<ContainerId> release, 
@@ -54,7 +56,7 @@ appSchedulingInfo 的类型是 `AppSchedulingInfo`，以`Scheduler`的角度看�
 
 ----------
 
-### NM心跳 ###
+### 二、NM心跳 ###
 
 Scheduler 处理 `NODE_UPDATE` 事件
 
