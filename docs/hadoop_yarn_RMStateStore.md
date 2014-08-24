@@ -115,3 +115,16 @@ RMStateStore只实现了存储状态的接口，具体的存储方法由实现�
 
 只有在RMActiveService启动的时候才会调用loadState方法，加载已经存储的RM的状态。需要指出的是，RM支持HA后，RM中的服务已经分为Always on和Active两部分，Always on的服务会在Active和Standby RM上启动，而Active服务只会在Active RM上启动，而RM启动后默认进入Standby，当前只能手动出发RM转换为Active，这时候RM就会加载已经存储的状态并还原了。
 
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/RMStateStore/RMStateStore_loadState.png)
+
+**RM如何还原状态**
+
+和"RM如何存储状态信息"相对应，还原也是通过四个实现类完成相应的加载方法：
+
+- NullRMStateStore的加载方法为空方法。
+
+- MemoryRMStateStore通过生成新的RMStats对象并把原有的状态存储到新的RMStats对象中。
+
+- FileSystemRMStateStore通过加载文件系统上的文件内容，还原存储状态到RMState对象中。
+
+- ZKRMStateStore通过加载ZK上的状态信息，还原存储状态到RMState对象中。

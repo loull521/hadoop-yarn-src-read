@@ -2,6 +2,22 @@
 
 ----------
 
+![](https://github.com/loull521/hadoop-yarn-src-read/raw/master/raw/pictures/scheduler/fairscheduler.png)
+
+`FairScheduler` 使多个 job 在有限的资源情况下，都能得到合理公平的运行，不会使作业出现长时间的饥饿。
+
+大致的分配思路就是如何把一快蛋糕分完， 这里首先需要一个分组 queue，job 是被提交到相应的 queue 内的。每个 queue 都有一个最大和最小资源量。job 没有最大资源量的限制，最小资源量为 0。
+
+`FairShare` 的数值表示预分配给每个 queue 及 job 的资源量， 如果没有抢占并不代表在实际分配的时候就一定能拿到，一般的实际的数值基本在 FairShare 左右徘徊。FairShare 算出来主要是为了抢占的时候使用的。
+
+`FairShare` 基本按照权重划分资源，由于minShare和maxShare的限制，并不是严格按照权重划分。
+
+资源权重比 R ≈ 资源获得量 / 队列权重
+
+某个队列的公平资源量FairShare ≈ 资源权重比 * 队列权重
+
+----------
+
 ### 一、为什么需要这个算法 ###
 
 为了抢占的需要
